@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="T-Rex Runner: Day/Night & Music",
+    page_title="T-Rex Runner: Duck & Jump Edition",
     page_icon="🦖",
     layout="wide"
 )
@@ -20,8 +20,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("🦖 Chrome Dino: Âm Nhạc & Ngày Đêm")
-st.caption("🎵 **Nhạc nền 8-bit**: Tự động phát khi chơi | ☀️/🌙 **Chu kỳ**: Đổi Ngày/Đêm mỗi 100 điểm | 🔊 Có nút Bật/Tắt nhạc")
+st.title("🦖 Chrome Dino: Nhảy & Cúi Người")
+st.caption("💻 **Máy tính**: `Space`/`↑` để nhảy, **giữ `↓` hoặc `S` để cúi** | 📱 **Điện thoại**: Chạm để nhảy, **giữ nút 👇 để cúi**")
 
 dino_full_code = """
 <!DOCTYPE html>
@@ -63,18 +63,40 @@ dino_full_code = """
     position: absolute;
     top: 10px;
     left: 12px;
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.75);
     border: 1px solid #cbd5e1;
     border-radius: 6px;
     padding: 4px 8px;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     z-index: 10;
+  }
+  /* Nút cúi cho điện thoại */
+  #duckBtn {
+    position: absolute;
+    bottom: 15px;
+    right: 15px;
+    background: rgba(30, 41, 59, 0.85);
+    color: #fff;
+    border: 2px solid #94a3b8;
+    border-radius: 50px;
+    padding: 10px 18px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    touch-action: none;
+  }
+  #duckBtn:active {
+    background: #0284c7;
   }
   #touchHint {
     position: absolute;
     bottom: 8px;
-    left: 50%;
+    left: 40%;
     transform: translateX(-50%);
     font-size: 11px;
     pointer-events: none;
@@ -85,19 +107,19 @@ dino_full_code = """
 
 <div id="container">
   <button id="soundBtn">🔊 Bật âm thanh</button>
+  <button id="duckBtn">👇 Cúi</button>
   <canvas id="gameCanvas" width="800" height="270"></canvas>
-  <div id="touchHint">Chạm vào màn hình hoặc bấm Space để nhảy</div>
+  <div id="touchHint">Space / Chạm để nhảy - Giữ Mũi tên xuống / Nút 👇 để cúi</div>
 </div>
 
 <script>
-// --- HỆ THỐNG ÂM THANH & NHẠC NỀN 8-BIT RETRO ---
+// --- ÂM THANH & BGM 8-BIT ---
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 let isMuted = false;
 let bgmInterval = null;
 let bgmStep = 0;
 
-// Giai điệu nhạc nền Chiptune vui nhộn (tần số nốt nhạc Hz)
 const melody = [
   261.63, 293.66, 329.63, 392.00, 329.63, 392.00, 523.25, 392.00,
   261.63, 293.66, 329.63, 349.23, 329.63, 293.66, 261.63, 196.00,
@@ -115,14 +137,12 @@ function playBGMNote() {
   try {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = 'triangle'; // Âm sắc ấm của game 8-bit
+    osc.type = 'triangle';
     const freq = melody[bgmStep % melody.length];
     bgmStep++;
 
     const now = audioCtx.currentTime;
     osc.frequency.setValueAtTime(freq, now);
-
-    // Âm lượng nhẹ nhàng cho nền
     gain.gain.setValueAtTime(0.04, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
 
@@ -135,7 +155,7 @@ function playBGMNote() {
 
 function startBGM() {
   if (bgmInterval) return;
-  bgmInterval = setInterval(playBGMNote, 180); // Nhịp điệu ~166 BPM
+  bgmInterval = setInterval(playBGMNote, 180);
 }
 
 function stopBGM() {
@@ -184,7 +204,6 @@ function playSound(type) {
   } catch(e) {}
 }
 
-// Nút tắt/bật âm thanh
 const soundBtn = document.getElementById('soundBtn');
 soundBtn.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -195,7 +214,7 @@ soundBtn.addEventListener('click', (e) => {
   else if (!gameOver) startBGM();
 });
 
-// --- BIẾN VÀ CẤU HÌNH GAME ---
+// --- CẤU HÌNH GAME ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const touchHint = document.getElementById('touchHint');
@@ -208,16 +227,20 @@ let highScore = 0;
 let gameOver = false;
 let frameCount = 0;
 
-// Hệ thống Ngày / Đêm
 let isNight = false;
 let nightProgress = 0;
 
-// Khủng long T-Rex
+// Khủng long hỗ trợ cúi người
 const dino = {
   x: 50,
   y: GROUND_Y - 44,
   w: 44,
   h: 44,
+  standHeight: 44,
+  standWidth: 44,
+  duckHeight: 26,
+  duckWidth: 56,
+  isDucking: false,
   vy: 0,
   gravity: 0.95,
   jumpPower: -15,
@@ -225,7 +248,6 @@ const dino = {
   legStep: 0
 };
 
-// Phong cảnh: Mây & Đàn chim bay trên cao
 let clouds = [
   { x: 180, y: 45, speed: 0.6 },
   { x: 490, y: 70, speed: 0.5 },
@@ -238,7 +260,6 @@ let skyBirds = [
   { x: 800, y: 25, speed: 1.3, wing: 0 }
 ];
 
-// Ngôi sao ban đêm
 let stars = [];
 for (let i = 0; i < 35; i++) {
   stars.push({
@@ -249,18 +270,19 @@ for (let i = 0; i < 35; i++) {
   });
 }
 
-// Gờ đất sỏi
 let groundBumps = [];
 for (let i = 0; i < 800; i += 28) {
   groundBumps.push({ x: i, len: 10 + Math.random() * 16 });
 }
 
-// Chướng ngại vật
 let obstacles = [];
 let nextObstacleTimer = 65;
 
 function resetGame() {
-  dino.y = GROUND_Y - 44;
+  dino.isDucking = false;
+  dino.h = dino.standHeight;
+  dino.w = dino.standWidth;
+  dino.y = GROUND_Y - dino.standHeight;
   dino.vy = 0;
   dino.grounded = true;
   obstacles = [];
@@ -275,25 +297,34 @@ function resetGame() {
   startBGM();
 }
 
+// Sinh chướng ngại vật (Thêm chim bay buộc phải cúi)
 function spawnObstacle() {
   const rand = Math.random();
-  // Chim pterodactyl xuất hiện khi điểm > 100
-  if (score > 100 && rand < 0.4) {
+
+  if (score > 100 && rand < 0.45) {
     let birdY;
     const tier = Math.random();
-    if (tier < 0.45) birdY = GROUND_Y - 30; // Bay sát đất
-    else if (tier < 0.8) birdY = GROUND_Y - 55; // Tầm vừa
-    else birdY = GROUND_Y - 80; // Tầm cao
+
+    if (tier < 0.45) {
+      // 1. Tầm cao ngang người (GROUND_Y - 54px): Phải cúi để vượt qua!
+      birdY = GROUND_Y - 54;
+    } else if (tier < 0.8) {
+      // 2. Tầm sát đất: Phải nhảy
+      birdY = GROUND_Y - 32;
+    } else {
+      // 3. Tầm bay rất cao: Có thể chạy qua bình thường
+      birdY = GROUND_Y - 82;
+    }
 
     obstacles.push({
       type: 'pterodactyl',
       x: canvas.width + 25,
       y: birdY,
-      w: 42,
+      w: 44,
       h: 28,
       wingState: 0
     });
-  } else if (rand < 0.72) {
+  } else if (rand < 0.75) {
     obstacles.push({
       type: 'cactus_group',
       x: canvas.width + 25,
@@ -312,32 +343,58 @@ function spawnObstacle() {
   }
 }
 
-// --- VẼ CÁC ĐỐI TƯỢNG SPRITE ---
+// --- VẼ KHỦNG LONG: ĐỨNG VÀ CÚI ---
 function drawDino(x, y, color) {
   ctx.fillStyle = color;
-  ctx.fillRect(x + 16, y + 2, 22, 14); // Đầu
-  ctx.fillRect(x + 12, y + 14, 20, 18); // Thân
-  ctx.fillRect(x + 4, y + 18, 10, 10); // Đuôi
 
-  // Mắt
-  ctx.fillStyle = isNight ? '#0f172a' : '#ffffff';
-  ctx.fillRect(x + 30, y + 5, 4, 4);
+  if (dino.isDucking && dino.grounded) {
+    // VẼ KHỦNG LONG ĐANG CÚI RẠP NGƯỜI
+    // Thân dài nằm ngang
+    ctx.fillRect(x + 10, y + 8, 32, 12);
+    // Đầu chúc về trước
+    ctx.fillRect(x + 36, y + 4, 18, 12);
+    // Đuôi sau
+    ctx.fillRect(x, y + 10, 10, 8);
 
-  // Tay
-  ctx.fillStyle = color;
-  ctx.fillRect(x + 32, y + 20, 6, 3);
+    // Mắt
+    ctx.fillStyle = isNight ? '#0f172a' : '#ffffff';
+    ctx.fillRect(x + 48, y + 6, 4, 4);
 
-  // Chân
-  if (!dino.grounded) {
-    ctx.fillRect(x + 14, y + 32, 4, 10);
-    ctx.fillRect(x + 24, y + 32, 4, 8);
-  } else {
+    // Chân đạp khi cúi
+    ctx.fillStyle = color;
     if (dino.legStep === 0) {
-      ctx.fillRect(x + 14, y + 32, 4, 12);
-      ctx.fillRect(x + 24, y + 32, 4, 6);
+      ctx.fillRect(x + 16, y + 20, 5, 6);
+      ctx.fillRect(x + 28, y + 20, 5, 4);
     } else {
-      ctx.fillRect(x + 14, y + 32, 4, 6);
-      ctx.fillRect(x + 24, y + 32, 4, 12);
+      ctx.fillRect(x + 16, y + 20, 5, 4);
+      ctx.fillRect(x + 28, y + 20, 5, 6);
+    }
+  } else {
+    // VẼ KHỦNG LONG ĐỨNG BÌNH THƯỜNG
+    ctx.fillRect(x + 16, y + 2, 22, 14); // Đầu
+    ctx.fillRect(x + 12, y + 14, 20, 18); // Thân
+    ctx.fillRect(x + 4, y + 18, 10, 10); // Đuôi
+
+    // Mắt
+    ctx.fillStyle = isNight ? '#0f172a' : '#ffffff';
+    ctx.fillRect(x + 30, y + 5, 4, 4);
+
+    // Tay
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 32, y + 20, 6, 3);
+
+    // Chân
+    if (!dino.grounded) {
+      ctx.fillRect(x + 14, y + 32, 4, 10);
+      ctx.fillRect(x + 24, y + 32, 4, 8);
+    } else {
+      if (dino.legStep === 0) {
+        ctx.fillRect(x + 14, y + 32, 4, 12);
+        ctx.fillRect(x + 24, y + 32, 4, 6);
+      } else {
+        ctx.fillRect(x + 14, y + 32, 4, 6);
+        ctx.fillRect(x + 24, y + 32, 4, 12);
+      }
     }
   }
 }
@@ -353,9 +410,10 @@ function drawCactus(x, y, w, h, color) {
 
 function drawPterodactyl(x, y, w, h, wing, color) {
   ctx.fillStyle = color;
-  ctx.fillRect(x + 8, y + 10, 22, 10);
-  ctx.fillRect(x, y + 12, 8, 4);
-  ctx.fillRect(x + 28, y + 12, 10, 6);
+  ctx.fillRect(x + 8, y + 10, 24, 10);
+  ctx.fillRect(x, y + 12, 8, 4); // Mỏ
+  ctx.fillRect(x + 32, y + 12, 10, 6); // Đuôi
+
   if (wing === 0) ctx.fillRect(x + 14, y, 6, 12);
   else ctx.fillRect(x + 14, y + 16, 6, 12);
 }
@@ -404,7 +462,7 @@ function drawSun(x, y) {
   ctx.fill();
 }
 
-// --- CẬP NHẬT GAME ENGINE ---
+// --- CẬP NHẬT TRẠNG THÁI ---
 function update() {
   if (gameOver) return;
 
@@ -413,18 +471,25 @@ function update() {
     dino.legStep = dino.legStep === 0 ? 1 : 0;
   }
 
-  // Tăng tốc dần theo điểm số
   gameSpeed = baseSpeed + Math.min(score / 150, 8);
 
-  // ĐỔI NGÀY / ĐÊM MỖI 100 ĐIỂM
+  // Đổi Ngày/Đêm mỗi 100 điểm
   const cycle = Math.floor(score / 100);
   isNight = (cycle % 2 === 1);
-
-  // Hiệu ứng chuyển màu mượt mà
   if (isNight && nightProgress < 1) nightProgress = Math.min(1, nightProgress + 0.025);
   if (!isNight && nightProgress > 0) nightProgress = Math.max(0, nightProgress - 0.025);
 
-  // Vật lý nhảy
+  // Xử lý kích thước Hitbox khi Cúi
+  if (dino.isDucking && dino.grounded) {
+    dino.h = dino.duckHeight;
+    dino.w = dino.duckWidth;
+    dino.y = GROUND_Y - dino.duckHeight;
+  } else {
+    dino.h = dino.standHeight;
+    dino.w = dino.standWidth;
+  }
+
+  // Nhảy và Trọng lực
   dino.vy += dino.gravity;
   dino.y += dino.vy;
   if (dino.y >= GROUND_Y - dino.h) {
@@ -433,7 +498,7 @@ function update() {
     dino.grounded = true;
   }
 
-  // Mây và Đàn chim trên cao
+  // Mây và chim nền
   clouds.forEach(c => {
     c.x -= c.speed;
     if (c.x < -60) {
@@ -451,7 +516,6 @@ function update() {
     }
   });
 
-  // Mặt đất
   groundBumps.forEach(g => {
     g.x -= gameSpeed;
     if (g.x < -20) g.x = canvas.width + Math.random() * 30;
@@ -465,7 +529,7 @@ function update() {
     nextObstacleTimer = minSpacing + Math.floor(Math.random() * 35);
   }
 
-  // Va chạm
+  // Kiểm tra va chạm
   for (let i = obstacles.length - 1; i >= 0; i--) {
     let obs = obstacles[i];
     obs.x -= gameSpeed;
@@ -490,15 +554,12 @@ function update() {
     if (obs.x + obs.w < 0) {
       obstacles.splice(i, 1);
       score += 10;
-      // Kêu chuông mỗi khi đạt mốc 100 điểm đổi chu kỳ
-      if (score > 0 && score % 100 === 0) {
-        playSound('milestone');
-      }
+      if (score > 0 && score % 100 === 0) playSound('milestone');
     }
   }
 }
 
-// --- RENDER HÌNH ẢNH ---
+// --- VẼ KHUNG HÌNH ---
 function draw() {
   const bgR = Math.round(248 - nightProgress * (248 - 15));
   const bgG = Math.round(250 - nightProgress * (250 - 23));
@@ -515,7 +576,6 @@ function draw() {
   const skyBirdColor = isNight ? '#94a3b8' : '#64748b';
   const cloudColor = isNight ? 'rgba(51, 65, 85, 0.7)' : 'rgba(203, 213, 225, 0.8)';
 
-  // Mặt trời / Mặt trăng & Sao
   if (nightProgress > 0.1) {
     stars.forEach(s => {
       s.twinkle += 0.05;
@@ -528,11 +588,9 @@ function draw() {
     drawSun(710, 45);
   }
 
-  // Mây & Chim trời
   clouds.forEach(c => drawCloud(c.x, c.y, cloudColor));
   skyBirds.forEach(b => drawSkyBird(b.x, b.y, b.wing, skyBirdColor));
 
-  // Đường chạy
   ctx.strokeStyle = groundColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -548,7 +606,6 @@ function draw() {
     ctx.stroke();
   });
 
-  // Nhân vật & Chướng ngại vật
   drawDino(dino.x, dino.y, primaryColor);
 
   obstacles.forEach(obs => {
@@ -562,14 +619,12 @@ function draw() {
     }
   });
 
-  // Bảng điểm
   ctx.fillStyle = primaryColor;
   ctx.font = 'bold 15px "Courier New", monospace';
   ctx.textAlign = 'right';
   const cycleTag = isNight ? '🌙 ĐÊM' : '☀️ NGÀY';
   ctx.fillText(`${cycleTag}  HI ${highScore.toString().padStart(5, '0')}  ${score.toString().padStart(5, '0')}`, canvas.width - 20, 30);
 
-  // Màn hình thua
   if (gameOver) {
     ctx.fillStyle = isNight ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)';
     ctx.fillRect(canvas.width / 2 - 170, 65, 340, 105);
@@ -591,35 +646,78 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
-// --- ĐIỀU KHIỂN ---
+// --- ĐIỀU KHIỂN NHẢY & CÚI ---
 function handleJump() {
   ensureAudio();
   if (gameOver) {
     resetGame();
-  } else if (dino.grounded) {
+  } else if (dino.grounded && !dino.isDucking) {
     dino.vy = dino.jumpPower;
     dino.grounded = false;
     playSound('jump');
-    startBGM(); // Tự động phát nhạc nền khi người chơi bắt đầu
+    startBGM();
   }
 }
 
+// Bàn phím máy tính
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'ArrowUp') {
     e.preventDefault();
     handleJump();
+  } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+    e.preventDefault();
+    ensureAudio();
+    if (dino.grounded) {
+      dino.isDucking = true;
+    } else {
+      // Nhấn mũi tên xuống khi đang bay trên không để rơi nhanh xuống đất
+      dino.vy += 8;
+    }
   }
 });
 
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+    dino.isDucking = false;
+  }
+});
+
+// Nút Cúi ảo trên điện thoại / Cảm ứng
+const duckBtn = document.getElementById('duckBtn');
+
+duckBtn.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  ensureAudio();
+  if (dino.grounded) dino.isDucking = true;
+  else dino.vy += 8;
+}, { passive: false });
+
+duckBtn.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  dino.isDucking = false;
+});
+
+duckBtn.addEventListener('mousedown', (e) => {
+  e.stopPropagation();
+  ensureAudio();
+  if (dino.grounded) dino.isDucking = true;
+  else dino.vy += 8;
+});
+
+window.addEventListener('mouseup', () => {
+  dino.isDucking = false;
+});
+
+// Chạm màn hình để nhảy
 const container = document.getElementById('container');
 container.addEventListener('touchstart', (e) => {
-  if (e.target.id === 'soundBtn') return;
+  if (e.target.id === 'soundBtn' || e.target.id === 'duckBtn') return;
   e.preventDefault();
   handleJump();
 }, { passive: false });
 
 container.addEventListener('mousedown', (e) => {
-  if (e.target.id === 'soundBtn') return;
+  if (e.target.id === 'soundBtn' || e.target.id === 'duckBtn') return;
   handleJump();
 });
 
@@ -629,4 +727,4 @@ gameLoop();
 </html>
 """
 
-components.html(dino_full_code, height=310)
+components.html(dino_full_code, height=330)
